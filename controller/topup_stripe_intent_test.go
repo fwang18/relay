@@ -127,24 +127,33 @@ func TestStripeIntentStatusOnlyForOrderOwner(t *testing.T) {
 	assert.Contains(t, call(7, "ref_nope"), `"message":"error"`)
 }
 
-func TestStripeIntentCharge(t *testing.T) {
+func TestStripeIntentChargePassesStripeFeeToPayer(t *testing.T) {
 	setupStripeIntentTest(t)
+	oldRates := setting.StripeFeeRates
+	t.Cleanup(func() { setting.StripeFeeRates = oldRates })
+
 	tests := []struct {
 		name     string
 		amount   int64
 		method   string
+		rates    map[string]setting.StripeFeeRate
 		currency string
 		minor    int64
+		fee      int64
 		wantErr  bool
 	}{
-		{"wechat charges CNY fen", 10, "wechat_pay", "cny", 1000, false},
-		{"card charges CNY fen", 100, "card", "cny", 10000, false},
-		{"crypto converts to USD cents", 100, "crypto", "usd", 1389, false},
-		{"too small to charge", 0, "card", "", 0, true},
+		// (10 + 0.30/0.138889) / (1-0.039) = 12.653..., rounded up to the fen
+		{"wechat grossed up in CNY", 10, "wechat_pay", oldRates, "cny", 1266, 266, false},
+		{"card includes international and conversion fee", 100, "card", oldRates, "cny", 10800, 800, false},
+		{"crypto converts to USD then adds its fee", 100, "crypto", oldRates, "usd", 1411, 22, false},
+		{"no fee configured charges face value", 10, "wechat_pay", map[string]setting.StripeFeeRate{}, "cny", 1000, 0, false},
+		{"fee rate of 100% is rejected", 10, "card", map[string]setting.StripeFeeRate{"card": {Pct: 1}}, "", 0, 0, true},
+		{"too small to charge", 0, "card", map[string]setting.StripeFeeRate{}, "", 0, 0, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			currency, minor, err := stripeIntentCharge(tt.amount, tt.method)
+			setting.StripeFeeRates = tt.rates
+			currency, minor, fee, err := stripeIntentCharge(tt.amount, tt.method)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -152,6 +161,7 @@ func TestStripeIntentCharge(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tt.currency, currency)
 			assert.Equal(t, tt.minor, minor)
+			assert.Equal(t, tt.fee, fee)
 		})
 	}
 }

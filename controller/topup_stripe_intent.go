@@ -75,24 +75,64 @@ func GetStripeIntentConfig(c *gin.Context) {
 	})
 }
 
-// stripeIntentCharge returns the currency and smallest-unit amount to charge.
-// Card, WeChat Pay and Alipay charge CNY (same as the old Checkout price);
-// crypto only supports USD, so the CNY amount is converted.
-func stripeIntentCharge(amount int64, method string) (string, int64, error) {
-	cny := decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(setting.StripeUnitPrice))
+// stripeIntentCharge returns the currency, the amount to charge and the part of
+// it that is Stripe's fee, all in the smallest currency unit. Card, WeChat Pay
+// and Alipay charge CNY (same as the old Checkout price); crypto only supports
+// USD, so the CNY amount is converted first. Stripe's fee is passed on to the
+// payer: the charge is grossed up so that after Stripe's percentage and fixed
+// fee are taken, the net equals the face value (always rounded up to the cent).
+func stripeIntentCharge(amount int64, method string) (string, int64, int64, error) {
+	face := decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(setting.StripeUnitPrice))
+	usdPerCny := decimal.NewFromFloat(setting.StripeCryptoUsdPerCny)
 	currency := "cny"
 	if method == "crypto" {
-		if setting.StripeCryptoUsdPerCny <= 0 {
-			return "", 0, errors.New("crypto exchange rate is not configured")
+		if !usdPerCny.IsPositive() {
+			return "", 0, 0, errors.New("crypto exchange rate is not configured")
 		}
-		cny = cny.Mul(decimal.NewFromFloat(setting.StripeCryptoUsdPerCny))
+		face = face.Mul(usdPerCny)
 		currency = "usd"
 	}
-	minor := cny.Mul(decimal.NewFromInt(100)).Round(0).IntPart()
-	if minor < 50 {
-		return "", 0, errors.New("payment amount is too low")
+	fee := setting.StripeFeeRates[method]
+	if fee.Pct < 0 || fee.Pct >= 1 || fee.FixedUSD < 0 {
+		return "", 0, 0, errors.New("invalid Stripe fee rate")
 	}
-	return currency, minor, nil
+	fixed := decimal.NewFromFloat(fee.FixedUSD)
+	if currency == "cny" && fixed.IsPositive() {
+		if !usdPerCny.IsPositive() {
+			return "", 0, 0, errors.New("exchange rate is not configured")
+		}
+		fixed = fixed.Div(usdPerCny)
+	}
+	gross := face.Add(fixed).Div(decimal.NewFromInt(1).Sub(decimal.NewFromFloat(fee.Pct)))
+	hundred := decimal.NewFromInt(100)
+	minor := gross.Mul(hundred).RoundCeil(0).IntPart()
+	if minor < 50 {
+		return "", 0, 0, errors.New("payment amount is too low")
+	}
+	return currency, minor, minor - face.Mul(hundred).Round(0).IntPart(), nil
+}
+
+// GetStripeIntentQuote tells the wallet page what each method would charge for
+// an amount, fee included, so the price is shown before the user pays.
+func GetStripeIntentQuote(c *gin.Context) {
+	if !isStripeIntentEnabled() {
+		paymentError(c, common.NewMessage("Stripe is not configured or key is invalid"))
+		return
+	}
+	amount, err := strconv.ParseInt(c.Query("amount"), 10, 64)
+	if err != nil || amount < getStripeMinTopup() || amount > 10000 {
+		paymentError(c, common.NewMessage("Invalid parameters"))
+		return
+	}
+	quotes := gin.H{}
+	for _, method := range enabledStripeIntentMethods() {
+		currency, charge, fee, err := stripeIntentCharge(amount, method)
+		if err != nil {
+			continue
+		}
+		quotes[method] = gin.H{"currency": currency, "charge_amount": charge, "fee_amount": fee}
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "success", "data": quotes})
 }
 
 // RequestStripeIntent creates a pending top-up order and a PaymentIntent for it.
@@ -131,7 +171,7 @@ func RequestStripeIntent(c *gin.Context) {
 	) {
 		return
 	}
-	currency, minor, err := stripeIntentCharge(req.Amount, req.Method)
+	currency, minor, feeMinor, err := stripeIntentCharge(req.Amount, req.Method)
 	if err != nil {
 		paymentError(c, common.NewMessage("Failed to start payment"))
 		return
@@ -181,7 +221,7 @@ func RequestStripeIntent(c *gin.Context) {
 		return
 	}
 
-	logger.LogInfo(c.Request.Context(), common.LogText("Stripe in-page top-up order created user_id=%d trade_no=%s method=%s amount=%d money=%.2f charge=%d%s", id, tradeNo, req.Method, req.Amount, chargedMoney, minor, currency))
+	logger.LogInfo(c.Request.Context(), common.LogText("Stripe in-page top-up order created user_id=%d trade_no=%s method=%s amount=%d money=%.2f charge=%d%s fee=%d", id, tradeNo, req.Method, req.Amount, chargedMoney, minor, currency, feeMinor))
 	c.JSON(http.StatusOK, gin.H{
 		"message": "success",
 		"data": gin.H{
@@ -189,6 +229,7 @@ func RequestStripeIntent(c *gin.Context) {
 			"client_secret": pi.ClientSecret,
 			"currency":      currency,
 			"charge_amount": minor,
+			"fee_amount":    feeMinor,
 			"money":         chargedMoney,
 		},
 	})

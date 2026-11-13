@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"maps"
 	"strconv"
 	"strings"
@@ -104,6 +105,9 @@ func InitOptionMap() {
 	common.OptionMap["StripePublishableKey"] = setting.StripePublishableKey
 	common.OptionMap["StripeInlineMethods"] = setting.StripeInlineMethods
 	common.OptionMap["StripeCryptoUsdPerCny"] = strconv.FormatFloat(setting.StripeCryptoUsdPerCny, 'f', -1, 64)
+	if feeRates, err := common.Marshal(setting.StripeFeeRates); err == nil {
+		common.OptionMap["StripeFeeRates"] = string(feeRates)
+	}
 	common.OptionMap["CreemApiKey"] = setting.CreemApiKey
 	common.OptionMap["CreemProducts"] = setting.CreemProducts
 	common.OptionMap["CreemTestMode"] = strconv.FormatBool(setting.CreemTestMode)
@@ -567,6 +571,12 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StripeInlineMethods = value
 	case "StripeCryptoUsdPerCny":
 		setting.StripeCryptoUsdPerCny, _ = strconv.ParseFloat(value, 64)
+	case "StripeFeeRates":
+		feeRates := map[string]setting.StripeFeeRate{}
+		if err := common.UnmarshalJsonStr(value, &feeRates); err != nil {
+			return errors.New("invalid StripeFeeRates JSON")
+		}
+		setting.StripeFeeRates = feeRates
 	case "CreemApiKey":
 		setting.CreemApiKey = value
 	case "CreemProducts":
