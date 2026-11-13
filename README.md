@@ -1,3 +1,12 @@
+> **About this repository (fwang18/relay)**
+> This is a fork of [QuantumNous/new-api](https://github.com/QuantumNous/new-api), licensed under **AGPL-3.0** (see [LICENSE](./LICENSE) and [NOTICE](./NOTICE)). The default branch `relay` carries our changes on top of upstream, all source of which is published here:
+> - In-page Stripe payments via PaymentIntents (WeChat Pay, cards, USDC; Alipay once enabled) with the payment method shown inside our own page, instead of a redirect to Stripe Checkout (`controller/topup_stripe_intent.go`).
+> - Stripe fees are passed on to the payer: the charged amount is grossed up per payment method, and `GET /api/user/stripe/quote` returns the breakdown.
+> - New options: `StripePublishableKey`, `StripeInlineMethods`, `StripeCryptoUsdPerCny`, `StripeFeeRates`.
+> - The Stripe webhook now also accepts PaymentIntent events (`payment_intent.succeeded`, `payment_intent.canceled`).
+>
+> Everything else is upstream new-api. Upstream copyright and license notices are kept intact.
+
 <div align="center">
 
 ![new-api](/web/public/logo.png)
