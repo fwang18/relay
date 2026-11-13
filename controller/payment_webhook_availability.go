@@ -25,7 +25,7 @@ func isStripeWebhookConfigured() bool {
 }
 
 func isStripeWebhookEnabled() bool {
-	return isStripeTopUpEnabled()
+	return isStripeTopUpEnabled() || isStripeIntentEnabled()
 }
 
 func isCreemTopUpEnabled() bool {
