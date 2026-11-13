@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"github.com/bytedance/gopkg/util/gopool"
 	"maps"
 
 	"github.com/QuantumNous/new-api/common"
@@ -87,7 +88,45 @@ func ValidateTopUpQuotaCapacity(userId int, creditedQuota int) error {
 // creditTopUpQuota atomically enforces the wallet ceiling while adding quota.
 // Keeping the predicate and increment in one UPDATE prevents two
 // concurrent callbacks from both passing a separate read/check.
+//
+// Paid top-ups also credit the invitee's inviter with AffRebateRate percent of
+// the credited quota, inside the same transaction. Redemption codes are sold by
+// the site itself and use creditWalletQuota, which pays no rebate.
 func creditTopUpQuota(tx *gorm.DB, userId int, creditedQuota int, updates map[string]any) error {
+	if err := creditWalletQuota(tx, userId, creditedQuota, updates); err != nil {
+		return err
+	}
+	if common.AffRebateRate <= 0 {
+		return nil
+	}
+	var invitee User
+	if err := tx.Select("id", "inviter_id").Where("id = ?", userId).First(&invitee).Error; err != nil {
+		return err
+	}
+	rebate := creditedQuota * common.AffRebateRate / 100
+	if invitee.InviterId == 0 || invitee.InviterId == userId || rebate <= 0 {
+		return nil
+	}
+	result := tx.Model(&User{}).Where("id = ?", invitee.InviterId).Updates(map[string]any{
+		"aff_quota":   gorm.Expr("aff_quota + ?", rebate),
+		"aff_history": gorm.Expr("aff_history + ?", rebate),
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 1 {
+		// Written outside the transaction: on SQLite the log shares the single
+		// connection held by tx. This credit is the last step of every caller's
+		// transaction, so the log follows the commit.
+		inviterId := invitee.InviterId
+		gopool.Go(func() {
+			RecordLog(inviterId, LogTypeSystem, common.NewMessage("Invitation rebate {{quota}}", map[string]any{"quota": logger.FormatQuota(rebate)}))
+		})
+	}
+	return nil
+}
+
+func creditWalletQuota(tx *gorm.DB, userId int, creditedQuota int, updates map[string]any) error {
 	maxCurrentQuota, err := topUpQuotaMaxCurrent(creditedQuota)
 	if err != nil {
 		return err

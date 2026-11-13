@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "Заблокировано (код: {{code}})",
     "Body param": "Параметр тела запроса",
     "Bonus for inviting a user {{quota}}": "Бонус за приглашение пользователя {{quota}}",
+    "Invitation rebate {{quota}}": "Реферальный бонус {{quota}}",
     "Boolean": "Логический",
     "Border radius": "Радиус скругления",
     "Bot Name": "Имя бота",

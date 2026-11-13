@@ -2,6 +2,7 @@ package model
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -81,4 +82,27 @@ func TestLogOtherJSONStringDoesNotMutateReceiver(t *testing.T) {
 
 	require.Equal(t, before, after)
 	require.Equal(t, first, second)
+}
+
+func TestGetPublicStatsAggregatesByGroupWithoutUserData(t *testing.T) {
+	truncateTables(t)
+	publicStatsCache = nil
+	t.Cleanup(func() { publicStatsCache = nil })
+
+	now := time.Now().Unix()
+	logs := []*Log{
+		{UserId: 1, Type: LogTypeConsume, Group: "claude", UseTime: 2, CreatedAt: now - 60},
+		{UserId: 2, Type: LogTypeConsume, Group: "claude", UseTime: 4, CreatedAt: now - 60},
+		{UserId: 2, Type: LogTypeError, Group: "claude", CreatedAt: now - 60},
+		{UserId: 3, Type: LogTypeConsume, Group: "codex", UseTime: 1, CreatedAt: now - 2*24*3600},
+		{UserId: 4, Type: LogTypeTopup, Group: "claude", CreatedAt: now - 60},
+	}
+	require.NoError(t, LOG_DB.Create(logs).Error)
+
+	stats, err := GetPublicStats()
+	require.NoError(t, err)
+	require.Len(t, stats.Groups, 1)
+	assert.Equal(t, PublicGroupStat{Group: "claude", Requests: 3, Errors: 1, AvgUseTime: 3}, stats.Groups[0])
+	assert.Equal(t, int64(3), stats.Requests30d)
+	assert.Equal(t, int64(3), stats.ActiveUsers30)
 }

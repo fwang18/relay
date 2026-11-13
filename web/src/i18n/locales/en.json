@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "Blocked (code: {{code}})",
     "Body param": "Body param",
     "Bonus for inviting a user {{quota}}": "Bonus for inviting a user {{quota}}",
+    "Invitation rebate {{quota}}": "Invitation rebate {{quota}}",
     "Boolean": "Boolean",
     "Border radius": "Border radius",
     "Bot Name": "Bot Name",

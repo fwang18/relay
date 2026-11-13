@@ -130,6 +130,10 @@ var TelegramBotName = ""
 var QuotaForNewUser = 0
 var QuotaForInviter = 0
 var QuotaForInvitee = 0
+
+// AffRebateRate is the percent of every paid top-up an invitee makes that is
+// credited to the inviter's aff_quota (not withdrawable; transferable to quota).
+var AffRebateRate = 0
 var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false

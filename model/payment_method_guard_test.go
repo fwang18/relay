@@ -353,3 +353,41 @@ func TestRechargeEpayEnforcesFinalWalletQuotaLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestPaidTopUpCreditsInviterRebateButRedemptionDoesNot(t *testing.T) {
+	truncateTables(t)
+
+	oldQuotaPerUnit, oldRate := common.QuotaPerUnit, common.AffRebateRate
+	common.QuotaPerUnit = 500000
+	common.AffRebateRate = 5
+	t.Cleanup(func() { common.QuotaPerUnit, common.AffRebateRate = oldQuotaPerUnit, oldRate })
+
+	inviter := insertUserForPaymentGuardTest(t, 601, 0)
+	invitee := &User{Id: 602, Username: "rebate_invitee", AffCode: "rebate_invitee", Status: common.UserStatusEnabled, InviterId: inviter.Id}
+	require.NoError(t, DB.Create(invitee).Error)
+
+	order := createEpayTestOrder(t, invitee.Id, "EPAYREBATE", PaymentProviderEpay, common.TopUpStatusPending)
+	_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+
+	var got User
+	require.NoError(t, DB.Where("id = ?", inviter.Id).First(&got).Error)
+	assert.Equal(t, 2*500000*5/100, got.AffQuota)
+	assert.Equal(t, 2*500000*5/100, got.AffHistoryQuota)
+	assert.Equal(t, 0, got.Quota)
+
+	// A repeated callback must not pay the rebate twice.
+	_, err = RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+	require.NoError(t, DB.Where("id = ?", inviter.Id).First(&got).Error)
+	assert.Equal(t, 2*500000*5/100, got.AffQuota)
+
+	require.NoError(t, DB.AutoMigrate(&Redemption{}))
+	t.Cleanup(func() { DB.Exec("DELETE FROM redemptions") })
+	redemption := &Redemption{Name: "rebate", Key: "REBATEKEY00000000000000000000000", Status: common.RedemptionCodeStatusEnabled, Quota: 1000000}
+	require.NoError(t, redemption.Insert())
+	_, err = Redeem(redemption.Key, invitee.Id)
+	require.NoError(t, err)
+	require.NoError(t, DB.Where("id = ?", inviter.Id).First(&got).Error)
+	assert.Equal(t, 2*500000*5/100, got.AffQuota)
+}

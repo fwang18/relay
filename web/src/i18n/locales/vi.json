@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "Đã chặn (mã: {{code}})",
     "Body param": "Tham số body",
     "Bonus for inviting a user {{quota}}": "Thưởng mời người dùng {{quota}}",
+    "Invitation rebate {{quota}}": "Hoàn tiền giới thiệu {{quota}}",
     "Boolean": "Boolean",
     "Border radius": "Độ bo góc",
     "Bot Name": "Tên Bot",

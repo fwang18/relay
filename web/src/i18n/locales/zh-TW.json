@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "已攔截（代碼：{{code}}）",
     "Body param": "請求體參數",
     "Bonus for inviting a user {{quota}}": "邀請使用者贈送 {{quota}}",
+    "Invitation rebate {{quota}}": "邀請返利 {{quota}}",
     "Boolean": "布林",
     "Border radius": "圓角",
     "Bot Name": "機械人名稱",

@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "Bloquée (code : {{code}})",
     "Body param": "Paramètre de corps",
     "Bonus for inviting a user {{quota}}": "Bonus pour l'invitation d'un utilisateur {{quota}}",
+    "Invitation rebate {{quota}}": "Remise de parrainage {{quota}}",
     "Boolean": "Booléen",
     "Border radius": "Rayon de bordure",
     "Bot Name": "Nom du bot",

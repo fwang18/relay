@@ -989,6 +989,7 @@
     "Blocked (code: {{code}})": "ブロック済み（コード：{{code}}）",
     "Body param": "ボディパラメータ",
     "Bonus for inviting a user {{quota}}": "ユーザー招待ボーナス {{quota}}",
+    "Invitation rebate {{quota}}": "招待リベート {{quota}}",
     "Boolean": "真偽値",
     "Border radius": "角丸",
     "Bot Name": "ボット名",

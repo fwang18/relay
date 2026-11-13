@@ -72,6 +72,10 @@ func GetStatus(c *gin.Context) {
 		"turnstile_site_key":          common.TurnstileSiteKey,
 		"docs_link":                   operation_setting.GetGeneralSetting().DocsLink,
 		"quota_per_unit":              common.QuotaPerUnit,
+		"quota_for_new_user":          common.QuotaForNewUser,
+		"quota_for_inviter":           common.QuotaForInviter,
+		"quota_for_invitee":           common.QuotaForInvitee,
+		"aff_rebate_rate":             common.AffRebateRate,
 		// 兼容旧前端：保留 display_in_currency，同时提供新的 quota_display_type
 		"display_in_currency":           operation_setting.IsCurrencyDisplay(),
 		"quota_display_type":            operation_setting.GetQuotaDisplayType(),
@@ -327,4 +331,15 @@ func ResetPassword(c *gin.Context) {
 		"data":    password,
 	})
 	return
+}
+
+// GetPublicStats serves anonymous aggregate service health for the public
+// status page (no login). Numbers are cached for five minutes.
+func GetPublicStats(c *gin.Context) {
+	stats, err := model.GetPublicStats()
+	if err != nil {
+		common.ApiErrorT(c, "Failed to load service status")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": stats})
 }
