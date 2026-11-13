@@ -273,9 +273,12 @@ func Recharge(referenceId string, customerId string, callerIp string) (err error
 		if err != nil || quota <= 0 {
 			return ErrInvalidTopUpQuota
 		}
-		return creditTopUpQuota(tx, topUp.UserId, quota, map[string]any{
-			"stripe_customer": customerId,
-		})
+		// In-page payments have no Stripe Customer; keep any existing one.
+		var userUpdates map[string]any
+		if customerId != "" {
+			userUpdates = map[string]any{"stripe_customer": customerId}
+		}
+		return creditTopUpQuota(tx, topUp.UserId, quota, userUpdates)
 	})
 
 	if err != nil {
