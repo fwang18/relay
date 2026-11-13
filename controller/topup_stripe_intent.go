@@ -80,9 +80,14 @@ func GetStripeIntentConfig(c *gin.Context) {
 // and Alipay charge CNY (same as the old Checkout price); crypto only supports
 // USD, so the CNY amount is converted first. Stripe's fee is passed on to the
 // payer: the charge is grossed up so that after Stripe's percentage and fixed
-// fee are taken, the net equals the face value (always rounded up to the cent).
+// fee are taken, the net equals the discounted face value (always rounded up
+// to the cent). The returned fee is the part above the discounted face value.
 func stripeIntentCharge(amount int64, method string) (string, int64, int64, error) {
 	face := decimal.NewFromInt(amount).Mul(decimal.NewFromFloat(setting.StripeUnitPrice))
+	// Small price cut: pay face value minus StripeTopUpDiscountCny (credit is unchanged).
+	if discount := decimal.NewFromFloat(setting.StripeTopUpDiscountCny); discount.IsPositive() && face.Sub(discount).IsPositive() {
+		face = face.Sub(discount)
+	}
 	usdPerCny := decimal.NewFromFloat(setting.StripeCryptoUsdPerCny)
 	currency := "cny"
 	if method == "crypto" {

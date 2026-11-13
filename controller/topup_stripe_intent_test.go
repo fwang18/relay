@@ -129,8 +129,9 @@ func TestStripeIntentStatusOnlyForOrderOwner(t *testing.T) {
 
 func TestStripeIntentChargePassesStripeFeeToPayer(t *testing.T) {
 	setupStripeIntentTest(t)
-	oldRates := setting.StripeFeeRates
-	t.Cleanup(func() { setting.StripeFeeRates = oldRates })
+	oldRates, oldDiscount := setting.StripeFeeRates, setting.StripeTopUpDiscountCny
+	setting.StripeTopUpDiscountCny = 0
+	t.Cleanup(func() { setting.StripeFeeRates, setting.StripeTopUpDiscountCny = oldRates, oldDiscount })
 
 	tests := []struct {
 		name     string
@@ -164,4 +165,39 @@ func TestStripeIntentChargePassesStripeFeeToPayer(t *testing.T) {
 			assert.Equal(t, tt.fee, fee)
 		})
 	}
+}
+
+func TestStripeIntentChargeAppliesTopUpDiscount(t *testing.T) {
+	setupStripeIntentTest(t)
+	oldRates, oldDiscount := setting.StripeFeeRates, setting.StripeTopUpDiscountCny
+	t.Cleanup(func() { setting.StripeFeeRates, setting.StripeTopUpDiscountCny = oldRates, oldDiscount })
+
+	// No Stripe fee: pay N - 0.1.
+	setting.StripeFeeRates = map[string]setting.StripeFeeRate{}
+	setting.StripeTopUpDiscountCny = 0.1
+	currency, minor, fee, err := stripeIntentCharge(20, "wechat_pay")
+	require.NoError(t, err)
+	assert.Equal(t, "cny", currency)
+	assert.EqualValues(t, 1990, minor)
+	assert.EqualValues(t, 0, fee)
+
+	// With a Stripe fee: the discount comes off before the gross-up.
+	// (19.9 + 0.30/0.138889) / (1-0.039) = 22.955..., rounded up to the fen.
+	setting.StripeFeeRates = oldRates
+	_, minor, fee, err = stripeIntentCharge(20, "wechat_pay")
+	require.NoError(t, err)
+	assert.EqualValues(t, 2296, minor)
+	assert.EqualValues(t, 2296-1990, fee)
+
+	// Crypto: discount is converted at the same rate (19.9 * 0.138889 = 2.7639 USD, +1.5%).
+	_, minor, _, err = stripeIntentCharge(20, "crypto")
+	require.NoError(t, err)
+	assert.EqualValues(t, 281, minor)
+
+	// 0 switches it off.
+	setting.StripeTopUpDiscountCny = 0
+	setting.StripeFeeRates = map[string]setting.StripeFeeRate{}
+	_, minor, _, err = stripeIntentCharge(20, "wechat_pay")
+	require.NoError(t, err)
+	assert.EqualValues(t, 2000, minor)
 }

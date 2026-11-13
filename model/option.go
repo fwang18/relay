@@ -105,6 +105,7 @@ func InitOptionMap() {
 	common.OptionMap["StripePublishableKey"] = setting.StripePublishableKey
 	common.OptionMap["StripeInlineMethods"] = setting.StripeInlineMethods
 	common.OptionMap["StripeCryptoUsdPerCny"] = strconv.FormatFloat(setting.StripeCryptoUsdPerCny, 'f', -1, 64)
+	common.OptionMap["StripeTopUpDiscountCny"] = strconv.FormatFloat(setting.StripeTopUpDiscountCny, 'f', -1, 64)
 	if feeRates, err := common.Marshal(setting.StripeFeeRates); err == nil {
 		common.OptionMap["StripeFeeRates"] = string(feeRates)
 	}
@@ -571,6 +572,8 @@ func updateOptionMap(key string, value string) (err error) {
 		setting.StripeInlineMethods = value
 	case "StripeCryptoUsdPerCny":
 		setting.StripeCryptoUsdPerCny, _ = strconv.ParseFloat(value, 64)
+	case "StripeTopUpDiscountCny":
+		setting.StripeTopUpDiscountCny, _ = strconv.ParseFloat(value, 64)
 	case "StripeFeeRates":
 		feeRates := map[string]setting.StripeFeeRate{}
 		if err := common.UnmarshalJsonStr(value, &feeRates); err != nil {

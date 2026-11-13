@@ -15,6 +15,11 @@ var StripeInlineMethods = "wechat_pay,card,crypto"
 // which Stripe only accepts in USD. Default is about CNY 7.2 = USD 1.
 var StripeCryptoUsdPerCny = 0.138889
 
+// StripeTopUpDiscountCny is taken off what the payer is charged for every
+// top-up (face value N is still credited in full, only the price is N minus
+// this, before Stripe's fee is added). 0 turns it off.
+var StripeTopUpDiscountCny = 0.1
+
 // StripeFeeRate is what Stripe takes from one payment method: Pct of the
 // charged amount plus FixedUSD. It is passed on to the payer, so the amount
 // charged is grossed up until the net after Stripe's fee equals the face value.
