@@ -711,17 +711,17 @@ func TestSecurityAccountMailsFollowTheOwnersLanguage(t *testing.T) {
 	require.NoError(t, err)
 	response := securityEnrollmentRequest("POST", "/api/oauth/email/bind", string(request), "", identity, EmailBind)
 	require.Contains(t, response.Body.String(), `"success":true`)
-	assert.Contains(t, mails("new@example.com"), "请确认将此邮箱地址绑定到您的账户。")
-	assert.Contains(t, mails("new@example.com"), "您的账户安全设置有变动：邮箱地址已确认。")
-	assert.Contains(t, mails("previous@example.com"), "您的账户正在申请更换邮箱地址，请确认替换当前邮箱。")
-	assert.Contains(t, mails("previous@example.com"), "您的账户安全设置有变动：邮箱地址已更换。")
+	assert.Contains(t, mails("new@example.com"), "你正在把此邮箱绑定到你的账号。")
+	assert.Contains(t, mails("new@example.com"), "你的账号有变动：邮箱地址已确认。")
+	assert.Contains(t, mails("previous@example.com"), "你的账号正在更换邮箱，以下是确认验证码。")
+	assert.Contains(t, mails("previous@example.com"), "你的账号有变动：邮箱地址已更换。")
 
 	for _, tc := range []struct {
 		name, saved, acceptLanguage, receiver, want string
 	}{
-		{"request language when none is saved", "", "zh-TW", "tw@example.com", "您的帳戶安全設定有變動：已綁定登入帳號 &lt;b&gt;Corp&lt;/b&gt;。"},
-		{"saved language over the request", "en", "zh-CN", "en@example.com", "Your account security settings have changed: Login account linked: &lt;b&gt;Corp&lt;/b&gt;."},
-		{"default language when neither states one", "", "", "default@example.com", "Your account security settings have changed: Login account linked: &lt;b&gt;Corp&lt;/b&gt;."},
+		{"request language when none is saved", "", "zh-TW", "tw@example.com", "你的账号有变动：已绑定登录账号 &lt;b&gt;Corp&lt;/b&gt;。"},
+		{"saved language over the request", "en", "zh-CN", "en@example.com", "你的账号有变动：已绑定登录账号 &lt;b&gt;Corp&lt;/b&gt;。"},
+		{"default language when neither states one", "", "", "default@example.com", "你的账号有变动：已绑定登录账号 &lt;b&gt;Corp&lt;/b&gt;。"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			saveLanguage(tc.saved)

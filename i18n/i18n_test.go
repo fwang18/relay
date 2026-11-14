@@ -81,7 +81,7 @@ func TestBackendMessageLanguage(t *testing.T) {
 	t.Cleanup(func() { common.DefaultLanguage = "" })
 	quota := map[string]any{"Remaining": "$0.10"}
 	const english = "Insufficient user quota, remaining quota: $0.10"
-	const chinese = "用户额度不足, 剩余额度: $0.10"
+	const chinese = "余额不足，剩余 $0.10，请充值"
 	for _, tc := range []struct {
 		name            string
 		defaultLanguage string
