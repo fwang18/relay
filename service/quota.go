@@ -3,6 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/QuantumNous/new-api/pkg/billingexpr"
 	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/QuantumNous/new-api/setting/ratio_setting"
 	"github.com/QuantumNous/new-api/types"
 
@@ -496,7 +498,7 @@ func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preCon
 		}
 		lang := userSetting.Language
 		prompt := i18n.Translate(lang, i18n.MsgNotifyQuotaLowTitle)
-		content, values := quotaNotifyContent(lang, userSetting.NotifyType, prompt, logger.FormatQuota(balanceAfter))
+		content, values := quotaNotifyContent(lang, userSetting.NotifyType, prompt, formatNoticeQuota(balanceAfter))
 		err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values))
 		if err != nil {
 			common.SysError(common.LogText("failed to send quota notify to user %d: %s", relayInfo.UserId, err.Error()))
@@ -523,7 +525,7 @@ func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {
 
 		lang := userSetting.Language
 		prompt := i18n.Translate(lang, i18n.MsgNotifySubscriptionQuotaLowTitle)
-		content, values := quotaNotifyContent(lang, userSetting.NotifyType, prompt, logger.FormatQuota(int(remaining)))
+		content, values := quotaNotifyContent(lang, userSetting.NotifyType, prompt, formatNoticeQuota(int(remaining)))
 		if err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values)); err != nil {
 			common.SysError(common.LogText("failed to send subscription quota notify to user %d: %s", relayInfo.UserId, err.Error()))
 		}
@@ -548,6 +550,26 @@ func quotaReminderDue(userSetting dto.UserSetting, before int64, after int64) bo
 		threshold = userSetting.QuotaWarningThreshold
 	}
 	return float64(before) >= threshold && float64(after) < threshold
+}
+
+// formatNoticeQuota formats a balance for user-facing notices (email, Bark,
+// Gotify): two decimals, symbol attached to the number. Site-wide quota display
+// (logger.FormatQuota) is unchanged.
+func formatNoticeQuota(quota int) string {
+	s := logger.FormatQuota(quota)
+	if operation_setting.GetQuotaDisplayType() == operation_setting.QuotaDisplayTypeTokens {
+		return s
+	}
+	i := strings.IndexAny(s, "0123456789")
+	if i < 0 {
+		return s
+	}
+	sym := strings.TrimSpace(strings.ReplaceAll(s[:i], "＄", "$"))
+	v, err := strconv.ParseFloat(s[i:], 64)
+	if err != nil {
+		return s
+	}
+	return fmt.Sprintf("%s%.2f", sym, v)
 }
 
 // quotaNotifyContent renders a low-quota notice in the user's saved language.
