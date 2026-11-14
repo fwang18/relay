@@ -4,11 +4,40 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	"html"
 	"net/smtp"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
 )
+
+var (
+	htmlBreakRe = regexp.MustCompile(`(?i)</p>|<br\s*/?>`)
+	htmlLinkRe  = regexp.MustCompile(`(?is)<a\s[^>]*href=['"]([^'"]+)['"][^>]*>.*?</a>`)
+	htmlTagRe   = regexp.MustCompile(`(?s)<[^>]*>`)
+)
+
+// htmlToPlainText makes the text/plain part of a mail: paragraphs become
+// lines, links keep their address, other tags are dropped.
+func htmlToPlainText(content string) string {
+	text := htmlLinkRe.ReplaceAllString(content, "$1")
+	text = htmlBreakRe.ReplaceAllString(text, "\n")
+	text = htmlTagRe.ReplaceAllString(text, "")
+	return strings.TrimSpace(html.UnescapeString(text))
+}
+
+// wrapBase64 encodes a MIME body part in base64 lines of at most 76 bytes.
+func wrapBase64(s string) string {
+	encoded := base64.StdEncoding.EncodeToString([]byte(s))
+	var b strings.Builder
+	for len(encoded) > 76 {
+		b.WriteString(encoded[:76] + "\r\n")
+		encoded = encoded[76:]
+	}
+	b.WriteString(encoded)
+	return b.String()
+}
 
 func generateMessageID() (string, error) {
 	split := strings.Split(SMTPFrom, "@")
@@ -100,14 +129,20 @@ func SendEmail(subject string, receiver string, content string) error {
 	if SMTPServer == "" && SMTPAccount == "" {
 		return NewMessage("SMTP server is not configured")
 	}
+	boundary := "guizhi-" + GetRandomString(16)
 	encodedSubject := fmt.Sprintf("=?UTF-8?B?%s?=", base64.StdEncoding.EncodeToString([]byte(subject)))
 	mail := []byte(fmt.Sprintf("To: %s\r\n"+
 		"From: %s <%s>\r\n"+
 		"Subject: %s\r\n"+
 		"Date: %s\r\n"+
 		"Message-ID: %s\r\n"+ // 添加 Message-ID 头
-		"Content-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n",
-		receiver, SystemName, SMTPFrom, encodedSubject, time.Now().Format(time.RFC1123Z), id, content))
+		"MIME-Version: 1.0\r\n"+
+		"Content-Type: multipart/alternative; boundary=%q\r\n\r\n"+
+		"--%s\r\nContent-Type: text/plain; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n%s\r\n"+
+		"--%s\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Transfer-Encoding: base64\r\n\r\n%s\r\n"+
+		"--%s--\r\n",
+		receiver, SystemName, SMTPFrom, encodedSubject, time.Now().Format(time.RFC1123Z), id,
+		boundary, boundary, wrapBase64(htmlToPlainText(content)), boundary, wrapBase64(content), boundary))
 	auth := getSMTPAuth()
 	addr := fmt.Sprintf("%s:%d", SMTPServer, SMTPPort)
 	to := strings.Split(receiver, ";")

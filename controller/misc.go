@@ -237,7 +237,7 @@ func SendEmailVerification(c *gin.Context) {
 	// The address may not belong to an account yet, so the mail follows the
 	// request language.
 	systemName := map[string]any{"SystemName": common.SystemName}
-	subject := i18n.T(c, i18n.MsgEmailVerificationSubject, systemName)
+	subject := i18n.T(c, i18n.MsgEmailVerificationSubject, map[string]any{"SystemName": common.SystemName, "Minutes": common.VerificationValidMinutes})
 	content := fmt.Sprintf("<p>%s</p>"+
 		"<p>%s</p>"+
 		"<p>%s</p>",

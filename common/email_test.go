@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -289,7 +290,7 @@ func TestSendEmailUsesExplicitStartTLSWithInsecureCertificate(t *testing.T) {
 	select {
 	case message := <-server.messages:
 		require.Contains(t, message, "Subject: =?UTF-8?B?")
-		require.Contains(t, message, "<p>123456</p>")
+		require.Contains(t, message, "PHA+MTIzNDU2PC9wPg==") // base64 of the HTML part
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for SMTP DATA")
 	}
@@ -343,7 +344,7 @@ func TestSendEmailDoesNotAutoUpgradeWhenStartTLSDisabled(t *testing.T) {
 
 	select {
 	case message := <-server.messages:
-		require.Contains(t, message, "<p>123456</p>")
+		require.Contains(t, message, "PHA+MTIzNDU2PC9wPg==") // base64 of the HTML part
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for SMTP DATA")
 	}
@@ -446,7 +447,7 @@ func TestSendEmailSkipsAuthWhenCredentialsAreEmpty(t *testing.T) {
 
 	select {
 	case message := <-server.messages:
-		require.Contains(t, message, "<p>123456</p>")
+		require.Contains(t, message, "PHA+MTIzNDU2PC9wPg==") // base64 of the HTML part
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for SMTP DATA")
 	}
@@ -479,7 +480,7 @@ func TestSendEmailSkipsAuthWhenCredentialsAreIncomplete(t *testing.T) {
 
 	select {
 	case message := <-server.messages:
-		require.Contains(t, message, "<p>123456</p>")
+		require.Contains(t, message, "PHA+MTIzNDU2PC9wPg==") // base64 of the HTML part
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for SMTP DATA")
 	}
@@ -560,4 +561,9 @@ func TestSendEmailExplicitStartTLSRejectsUntrustedCertificateByDefault(t *testin
 	err := SendEmail("Verification", "receiver@example.com", "<p>123456</p>")
 	require.Error(t, err)
 	require.Contains(t, fmt.Sprint(err), "certificate")
+}
+
+func TestHTMLToPlainText(t *testing.T) {
+	got := htmlToPlainText("<p>验证码：<strong>123456</strong></p><p><a href='https://x.test/r?a=1&amp;b=2'>点此</a></p>")
+	assert.Equal(t, "验证码：123456\nhttps://x.test/r?a=1&b=2", got)
 }

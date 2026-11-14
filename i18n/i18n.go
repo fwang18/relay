@@ -97,7 +97,7 @@ func T(c *gin.Context, key string, args ...map[string]any) string {
 func Translate(lang, key string, args ...map[string]any) string {
 	// This fork serves Chinese-speaking users: mail to them is always Chinese,
 	// whatever the browser or saved language says.
-	if strings.HasPrefix(key, "email.") || strings.HasPrefix(key, "notify.quota_low") || strings.HasPrefix(key, "notify.subscription_quota_low") {
+	if strings.HasPrefix(key, "email.") || key == MsgUserDefaultTokenName || strings.HasPrefix(key, "notify.quota_low") || strings.HasPrefix(key, "notify.subscription_quota_low") {
 		lang = LangZhCN
 	}
 	if lang == "" {

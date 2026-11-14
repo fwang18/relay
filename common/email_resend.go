@@ -59,7 +59,8 @@ func sendResendEmail(apiKey, from, subject, receiver, content string) error {
 		To      []string `json:"to"`
 		Subject string   `json:"subject"`
 		HTML    string   `json:"html"`
-	}{sender.String(), to, subject, content})
+		Text    string   `json:"text"`
+	}{sender.String(), to, subject, content, htmlToPlainText(content)})
 	if err != nil {
 		return NewMessage("Resend request failed")
 	}
