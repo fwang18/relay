@@ -115,6 +115,9 @@ func creditTopUpQuota(tx *gorm.DB, userId int, creditedQuota int, updates map[st
 		return result.Error
 	}
 	if result.RowsAffected == 1 {
+		if err := tx.Create(&AffRebate{InviterId: invitee.InviterId, InviteeId: userId, Quota: rebate, CreatedAt: common.GetTimestamp()}).Error; err != nil {
+			return err
+		}
 		// Written outside the transaction: on SQLite the log shares the single
 		// connection held by tx. This credit is the last step of every caller's
 		// transaction, so the log follows the commit.

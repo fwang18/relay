@@ -391,3 +391,43 @@ func TestPaidTopUpCreditsInviterRebateButRedemptionDoesNot(t *testing.T) {
 	require.NoError(t, DB.Where("id = ?", inviter.Id).First(&got).Error)
 	assert.Equal(t, 2*500000*5/100, got.AffQuota)
 }
+
+func TestGetInviteesListsMaskedAccountsPaidAndRebate(t *testing.T) {
+	truncateTables(t)
+
+	oldQuotaPerUnit, oldRate := common.QuotaPerUnit, common.AffRebateRate
+	common.QuotaPerUnit = 500000
+	common.AffRebateRate = 5
+	t.Cleanup(func() { common.QuotaPerUnit, common.AffRebateRate = oldQuotaPerUnit, oldRate })
+
+	inviter := insertUserForPaymentGuardTest(t, 701, 0)
+	payer := &User{Id: 702, Username: "payer_user", Email: "alice@gmail.com", AffCode: "inv_payer", Status: common.UserStatusEnabled, InviterId: inviter.Id}
+	idle := &User{Id: 703, Username: "bob", AffCode: "inv_idle", Status: common.UserStatusEnabled, InviterId: inviter.Id}
+	other := &User{Id: 704, Username: "stranger", AffCode: "inv_other", Status: common.UserStatusEnabled}
+	require.NoError(t, DB.Create([]*User{payer, idle, other}).Error)
+
+	order := createEpayTestOrder(t, payer.Id, "EPAYINVITEES", PaymentProviderEpay, common.TopUpStatusPending)
+	_, err := RechargeEpay(order.TradeNo, "alipay", "127.0.0.1")
+	require.NoError(t, err)
+
+	list, err := GetInvitees(inviter.Id)
+	require.NoError(t, err)
+	require.Len(t, list, 2)
+	assert.Equal(t, "b***", list[0].Account)
+	assert.False(t, list[0].Paid)
+	assert.Equal(t, 0, list[0].RebateQuota)
+	assert.Equal(t, "al***@gmail.com", list[1].Account)
+	assert.True(t, list[1].Paid)
+	assert.Equal(t, 2*500000*5/100, list[1].RebateQuota)
+
+	none, err := GetInvitees(other.Id)
+	require.NoError(t, err)
+	assert.Empty(t, none)
+}
+
+func TestMaskAccount(t *testing.T) {
+	assert.Equal(t, "al***@gmail.com", MaskAccount("alice@gmail.com"))
+	assert.Equal(t, "b***", MaskAccount("bob"))
+	assert.Equal(t, "张***", MaskAccount("张三"))
+	assert.Equal(t, "***", MaskAccount(""))
+}

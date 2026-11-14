@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
@@ -342,4 +343,33 @@ func GetPublicStats(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": stats})
+}
+
+// GetSelfPerf returns the caller's own average response and first-response
+// time over a time range (same range limit as the user's log list).
+func GetSelfPerf(c *gin.Context) {
+	start, _ := strconv.ParseInt(c.Query("start_timestamp"), 10, 64)
+	end, _ := strconv.ParseInt(c.Query("end_timestamp"), 10, 64)
+	start, err := limitLogTimeRange(start, end)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	perf, err := model.GetUserPerf(c.GetInt("id"), start, end)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": perf})
+}
+
+// GetSelfInvitees lists the people the caller invited (masked accounts,
+// signup time, whether they paid, rebate they generated).
+func GetSelfInvitees(c *gin.Context) {
+	list, err := model.GetInvitees(c.GetInt("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": list})
 }
